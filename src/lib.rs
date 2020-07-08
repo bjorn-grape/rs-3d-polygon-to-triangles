@@ -3,23 +3,22 @@ use std::f32::EPSILON;
 use std::collections::LinkedList;
 
 fn is_coplanar(polygon: &Vec<usize>, positions: &Vec<Vector3<f32>>) -> bool {
+    if polygon.len() < 3 {
+        return false;
+    }
+    if polygon.len() == 3 {
+        return true;
+    }
     let mut plan_normals: Vec<Vector3<f32>> = vec![];
     let vec1: Vector3<f32> = &positions[polygon[1] as usize] - &positions[polygon[0] as usize];
-    let s0 = format!("{:?}", positions);
-    let s1 = format!("{:?}", vec1);
     for i in 0..(polygon.len() - 2) {
         let vec2: Vector3<f32> = &positions[polygon[i + 2] as usize] - &positions[polygon[0] as usize];
-        let s2 = format!("{:?}", vec2);
         plan_normals.push(vec1.cross(&vec2).normalize());
-        let s3 = format!("{:?}", plan_normals);
     }
     let n1 = &plan_normals[0];
-    let s4 = format!("{:?}", n1);
     for i in 0..(plan_normals.len() - 1) {
         let n2 = &plan_normals[i + 1];
-        let s5 = format!("{:?}", n2);
         let norm = (n1 - n2).norm();
-        let s6 = format!("{:?}", norm);
         if norm > EPSILON
         {
             return false;
@@ -133,33 +132,95 @@ pub fn triangularize(polygon: &Vec<usize>, positions: &Vec<Vector3<f32>>) -> Opt
 mod tests {
     use super::*;
     use nalgebra::Vector3;
+    use std::borrow::BorrowMut;
 
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
+    fn polygon_builder(v: Vec<(f32, f32, f32)>) -> (Vec<usize>, Vec<Vector3<f32>>)
+    {
+        let all_pts: Vec<Vector3<f32>> = v.iter()
+            .map(|&x| Vector3::new(x.0, x.1, x.2)).collect();
+        let numbers = 0..;
+        let polygon_indexes: Vec<usize> = numbers.take(v.len()).borrow_mut().collect();
+        return (polygon_indexes, all_pts);
+    }
+
+    fn test_coplanar(p: (Vec<usize>, Vec<Vector3<f32>>), expectation: bool) {
+        let res = is_coplanar(&p.0, &p.1);
+        assert_eq!(res, expectation);
     }
 
     #[test]
     fn coplanar_square() {
-        let p1 = Vector3::new(0.0, 0.0, 0.0);
-        let p2 = Vector3::new(0.0, 0.0, 1.0);
-        let p3 = Vector3::new(0.0, 1.0, 1.0);
-        let p4 = Vector3::new(0.0, 1.0, 0.0);
-        let all_pts: Vec<Vector3<f32>> = vec![p1, p2, p3, p4];
-        let polygon_indexes: Vec<usize> = vec![0, 1, 2, 3];
-        let res = is_coplanar(&polygon_indexes, &all_pts);
-        assert_eq!(res, true);
+        let p = polygon_builder(
+            vec![
+                (0.0, 0.0, 0.0),
+                (0.0, 0.0, 1.0),
+                (0.0, 1.0, 1.0),
+                (0.0, 1.0, 0.0)
+            ]);
+        let expectation = true;
+
+        test_coplanar(p, expectation);
     }
+
 
     #[test]
     fn not_coplanar_square() {
-        let p1 = Vector3::new(1.0, 0.0, 0.0);
-        let p2 = Vector3::new(0.0, 0.0, 1.0);
-        let p3 = Vector3::new(0.0, 1.0, 1.0);
-        let p4 = Vector3::new(0.0, 1.0, 0.0);
-        let all_pts: Vec<Vector3<f32>> = vec![p1, p2, p3, p4];
-        let polygon_indexes: Vec<usize> = vec![0, 1, 2, 3];
-        let res = is_coplanar(&polygon_indexes, &all_pts);
-        assert_eq!(res, false);
+        let p = polygon_builder(
+            vec![
+                (1.0, 0.0, 0.0),
+                (0.0, 0.0, 1.0),
+                (0.0, 1.0, 1.0),
+                (0.0, 1.0, 0.0)
+            ]);
+        let expectation = false;
+        test_coplanar(p, expectation);
+    }
+
+    /// You can view the related polygon here
+    /// https://www.geogebra.org/3d/qr4vgg33
+    #[test]
+    fn coplanar_convex_pentagon() {
+        let p = polygon_builder(
+            vec![
+                (0.0, 0.0, 4.0),
+                (4.0, 0.0, 4.0),
+                (6.0, 2.5, 2.0),
+                (4.0, 5.0, 0.0),
+                (0.0, 5.0, 0.0)
+            ]);
+        let expectation = true;
+        test_coplanar(p, expectation);
+    }
+
+    /// You can view the related polygon here
+    /// https://www.geogebra.org/3d/y4wbnm59
+    #[test]
+    fn coplanar_concave_pentagon() {
+        let p = polygon_builder(
+            vec![
+                (0.0, 0.0, 4.0),
+                (4.0, 0.0, 4.0),
+                (2.0, 2.5, 2.0),
+                (4.0, 5.0, 0.0),
+                (0.0, 5.0, 0.0)
+            ]);
+        let expectation = true;
+        test_coplanar(p, expectation);
+    }
+
+    /// You can view the related polygon here
+    /// https://www.geogebra.org/3d/xjs5mqdc
+    #[test]
+    fn non_coplanar_polygon() {
+        let p = polygon_builder(
+            vec![
+                (0.0, 0.0, 4.0),
+                (4.0, 0.0, 4.0),
+                (2.0, 2.5, 3.0),
+                (4.0, 5.0, 0.0),
+                (0.0, 5.0, 0.0)
+            ]);
+        let expectation = false;
+        test_coplanar(p, expectation);
     }
 }
