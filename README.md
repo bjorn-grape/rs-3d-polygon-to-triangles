@@ -12,5 +12,7 @@ cargo test
     pip install -r requirements.txt
     # then launch all the python test*.py files
     # i.e.:
-    python3 test1.py
+    python3 test2.py
     
+## Example of result for test2.py
+!["res_penta.jpg"]("res_penta.jpg")
