@@ -60,7 +60,7 @@ pub fn cross_2d(v1: &Vector2<f32>, v2: &Vector2<f32>) -> f32 {
     return &v1[0] * &v2[1] - &v1[1] * &v2[0];
 }
 
-
+// using the ear clipping method
 pub fn triangularize(polygon: &Vec<usize>, positions: &Vec<Vector3<f32>>) -> Option<Vec<Vector3<usize>>> {
     if polygon.len() < 3 || !is_coplanar(polygon, positions) {
         return None;
@@ -133,6 +133,8 @@ mod tests {
     use super::*;
     use nalgebra::Vector3;
     use std::borrow::BorrowMut;
+    use std::fs::File;
+    use std::io::Write;
 
     fn polygon_builder(v: Vec<(f32, f32, f32)>) -> (Vec<usize>, Vec<Vector3<f32>>)
     {
@@ -223,4 +225,89 @@ mod tests {
         let expectation = false;
         test_coplanar(p, expectation);
     }
+
+
+    fn test_triangularized(p: (Vec<usize>, Vec<Vector3<f32>>), size: usize) {
+        let res = triangularize(&p.0, &p.1);
+        assert_ne!(res, None);
+        assert_eq!(res.unwrap().len(), size);
+    }
+
+    #[test]
+    fn square_to_triangles() {
+        let p = polygon_builder(
+            vec![
+                (0.0, 0.0, 0.0),
+                (0.0, 0.0, 1.0),
+                (0.0, 1.0, 1.0),
+                (0.0, 1.0, 0.0)
+            ]);
+        test_triangularized(p, 2);
+    }
+
+    fn print_triangles_in_python_format(p: (Vec<usize>, Vec<Vector3<f32>>), file: &mut File) {
+        file.write(b"#! /bin/env/python3\n");
+        file.write(b"#/!\\ Generated file => run me with python3\n");
+        file.write(b"from base import make_plot\n");
+        let res = triangularize(&p.0, &p.1);
+        file.write(b"list_index = [");
+        let mut index: usize = 0;
+        let tri = &res.unwrap();
+        let maxlen = &tri.len();
+        for &elm in tri {
+            file.write(format!("[{},{},{}]", elm[0], elm[1], elm[2]).as_ref());
+            if index != maxlen - 1 {
+                file.write(b",");
+            }
+            index += 1;
+        }
+        file.write(b"]\n");
+        file.write(b"list_points = [");
+        let mut index2: usize = 0;
+        let maxlen2 = &p.1.len();
+        for &elm in &p.1 {
+            file.write(format!("[{},{},{}]", elm[0], elm[1], elm[2]).as_ref());
+            if index2 != maxlen2 - 1 {
+                file.write(b",");
+            }
+            index2 += 1;
+        }
+        file.write(b"]\n");
+        file.write(b"make_plot(list_index, list_points)\n");
+    }
+
+
+
+    #[test]
+    fn print_square_to_triangles() {
+        let mut file_out = File::create("python_testing/test1.py").unwrap();
+        let p = polygon_builder(
+            vec![
+                (0.0, 0.0, 0.0),
+                (0.0, 0.0, 1.0),
+                (0.0, 1.0, 1.0),
+                (0.0, 1.0, 0.0)
+            ]);
+
+        print_triangles_in_python_format(p, &mut file_out);
+    }
+
+    /// You can view the related polygon here
+    /// https://www.geogebra.org/3d/y4wbnm59
+    #[test]
+    fn print_concave_pentagon() {
+        let mut file_out = File::create("python_testing/test2.py").unwrap();
+
+        let p = polygon_builder(
+            vec![
+                (0.0, 0.0, 4.0),
+                (4.0, 0.0, 4.0),
+                (2.0, 2.5, 2.0),
+                (4.0, 5.0, 0.0),
+                (0.0, 5.0, 0.0)
+            ]);
+        print_triangles_in_python_format(p, &mut file_out);
+    }
+
+
 }

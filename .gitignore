@@ -16,3 +16,7 @@ Cargo.lock
 
 /target
 #Cargo.lock
+
+# for polygon display
+python_testing/test*.py
+python_testing/env
