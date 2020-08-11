@@ -15,4 +15,4 @@ cargo test
     python3 test2.py
     
 ## Example of result for test2.py
-!["res_penta.jpg"]("res_penta.jpg")
+!["respenta.jpg"]()
