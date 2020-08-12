@@ -18,3 +18,9 @@ cargo test
     
 ### Example of result for test2.py
 ![](respenta.jpg)
+
+### Example of result for test3.py
+#### example from Geogebra
+![](18gone_from_geogebra.jpg)
+#### result
+![](res_18gone.jpg)
