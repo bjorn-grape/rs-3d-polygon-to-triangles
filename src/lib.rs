@@ -1,7 +1,8 @@
-use nalgebra::{Vector3, Vector2};
+use nalgebra::{Vector3, Vector2, Vector};
 use std::f32::EPSILON;
 use std::collections::LinkedList;
 use std::borrow::BorrowMut;
+use crate::PolygonOrientation::ClockWise;
 
 fn is_coplanar(polygon: &Vec<usize>, positions: &Vec<Vector3<f32>>) -> bool {
     if polygon.len() < 3 {
@@ -12,9 +13,9 @@ fn is_coplanar(polygon: &Vec<usize>, positions: &Vec<Vector3<f32>>) -> bool {
     }
     let large_epsilon = EPSILON * 100.0; // sometimes the precision of mesh is low
     let mut plan_normals: Vec<Vector3<f32>> = vec![];
-    let vec1: Vector3<f32> = &positions[polygon[1] as usize] - &positions[polygon[0] as usize];
+    let vec1: Vector3<f32> = &positions[polygon[1]] - &positions[polygon[0]];
     for i in 0..(polygon.len() - 2) {
-        let vec2: Vector3<f32> = &positions[polygon[i + 2] as usize] - &positions[polygon[0] as usize];
+        let vec2: Vector3<f32> = &positions[polygon[i + 2]] - &positions[polygon[0]];
         plan_normals.push(vec1.cross(&vec2).normalize());
     }
     let n1 = &plan_normals[0];
@@ -47,12 +48,12 @@ fn project_to_2d(polygon: &Vec<usize>, positions: &Vec<Vector3<f32>>) -> Vec<Vec
     let e2z = e2[2];
     let mut projected_2d_points: Vec<Vector2<f32>> = vec![];
     for elm in polygon {
-        let v1: &Vector3<f32> = &positions[*elm as usize];
-        let x1 = v1[0];
-        let y1 = v1[1];
-        let z1 = v1[2];
-        let x_f: f32 = (x1 - x0) * e1x + (y1 - y0) * e1y + (z1 - z0) * e1z;
-        let y_f: f32 = (x1 - x0) * e2x + (y1 - y0) * e2y + (z1 - z0) * e2z;
+        let v1: &Vector3<f32> = &positions[*elm];
+        let vx = v1.x - x0;
+        let vy = v1.y - y0;
+        let vz = v1.z - z0;
+        let x_f: f32 = vx * e1x + vy * e1y + vz * e1z;
+        let y_f: f32 = vx * e2x + vy * e2y + vz * e2z;
         projected_2d_points.push(Vector2::new(x_f, y_f))
     }
     projected_2d_points
@@ -65,15 +66,35 @@ pub fn cross_2d(v1: &Vector2<f32>, v2: &Vector2<f32>) -> f32 {
 
 pub fn triangularize_polygon(v: &Vec<(f32, f32, f32)>) -> Option<Vec<Vector3<usize>>>
 {
-        let all_pts: Vec<Vector3<f32>> = v.iter()
-            .map(|&x| Vector3::new(x.0, x.1, x.2)).collect();
-        let numbers = 0..;
-        let polygon_indexes: Vec<usize> = numbers.take(v.len()).borrow_mut().collect();
-        return triangularize_index_list(&polygon_indexes, &all_pts);
+    let all_pts: Vec<Vector3<f32>> = v.iter()
+        .map(|&x| Vector3::new(x.0, x.1, x.2)).collect();
+    let numbers = 0..;
+    let polygon_indexes: Vec<usize> = numbers.take(v.len()).borrow_mut().collect();
+    return triangularize_index_list(&polygon_indexes, &all_pts);
+}
+
+pub enum PolygonOrientation {
+    ClockWise,
+    CounterClockwise,
+}
+
+/// https://stackoverflow.com/questions/1165647/how-to-determine-if-a-list-of-polygon-points-are-in-clockwise-order
+pub fn find_polygon_winding(index_list: &Vec<usize>, polygons: &Vec<Vector2<f32>>) -> PolygonOrientation
+{
+    let mut summ: f32 = 0.0;
+
+    for index in 1..index_list.len() {
+        let pt1 = polygons[index - 1];
+        let pt2 = polygons[index];
+        summ += (pt2.x - pt1.x) * (pt2.y + pt1.y);
+    }
+    return if summ < 0.0
+    { PolygonOrientation::ClockWise } else { PolygonOrientation::CounterClockwise };
 }
 
 // using the ear clipping method
-pub fn triangularize_index_list(index_list: &Vec<usize>, point3d_list: &Vec<Vector3<f32>>) -> Option<Vec<Vector3<usize>>> {
+pub fn triangularize_index_list(index_list: &Vec<usize>, point3d_list: &Vec<Vector3<f32>>)
+                                -> Option<Vec<Vector3<usize>>> {
     if index_list.len() < 3 || !is_coplanar(index_list, point3d_list) {
         return None;
     }
@@ -81,81 +102,74 @@ pub fn triangularize_index_list(index_list: &Vec<usize>, point3d_list: &Vec<Vect
 
     let mut triangle_list_2d: Vec<Vector3<usize>> = vec![];
 
-
-
     let mut index_linked_list: LinkedList<usize> = LinkedList::new();
-    for pass in 1..4 {
-        index_linked_list = LinkedList::new();
-        match pass {
-            1 => {
-                for i in (0 as usize)..polygon_2d.len() {
-                    &index_linked_list.push_back(i);
-                }
-            }
-            2 => {
-                for i in (0 as usize)..polygon_2d.len() {
-                    &index_linked_list.push_back(polygon_2d.len() - 1 - i);
-                }
-            }
-            _ => { return None; }
-        }
-        let max_len = index_linked_list.len();
-        let maxmax_len = index_linked_list.len();
-        let mut turn: usize = 0;
-        while &index_linked_list.len() > &(3 as usize) {
-            turn += 1;
-            if turn > max_len && max_len == index_linked_list.len() || turn > maxmax_len * maxmax_len {
-                println!("TOO LOONG.... SKIP");
-                break;
-            }
-            let i0 = index_linked_list.pop_front().unwrap();
-            let i1 = index_linked_list.pop_front().unwrap();
-            let i2 = index_linked_list.pop_front().unwrap();
-            let x0 = &polygon_2d[i0];
-            let x1 = &polygon_2d[i1];
-            let x2 = &polygon_2d[i2];
-            let v1 = x1 - x0;
-            let v2 = x2 - x0;
-            let cross_v1_v2 = cross_2d(&v1, &v2);
-            if cross_v1_v2 < 0.0 {
-                index_linked_list.push_front(i2);
-                index_linked_list.push_front(i1);
-                index_linked_list.push_back(i0);
-                continue;
-            }
-            let u0 = x1 - x0;
-            let u1 = x2 - x1;
-            let u2 = x0 - x2;
 
-            let mut pt_in_triangle_exist = false;
-            for &elm in &index_linked_list {
-                let pt = &polygon_2d[elm];
-                let w0 = pt - x0;
-                let cross0 = cross_2d(&u0, &w0);
-                let w1 = pt - x1;
-                let cross1 = cross_2d(&u1, &w1);
-                let w2 = pt - x2;
-                let cross2 = cross_2d(&u2, &w2);
-                if cross0 > 0.0 && cross1 > 0.0 && cross2 > 0.0 {
-                    // point in triangle cannot make mesh
-                    pt_in_triangle_exist = true;
-                    break;
-                }
+    let winding = find_polygon_winding(index_list, &polygon_2d);
+
+    index_linked_list = LinkedList::new();
+    match &winding {
+        ClockWise => {
+            for i in 0..polygon_2d.len() {
+                &index_linked_list.push_back(i);
             }
-            if pt_in_triangle_exist {
-                index_linked_list.push_front(i2);
-                index_linked_list.push_front(i1);
-                index_linked_list.push_back(i0);
-                continue;
-            }
-            println!("=======> GOOD");
-            triangle_list_2d.push(Vector3::new(i0, i1, i2));
-            index_linked_list.push_front(i2);
-            index_linked_list.push_back(i0);
         }
-        if index_linked_list.len() <= 3 {
+        CounterClockwise => {
+            for i in 0..polygon_2d.len() {
+                &index_linked_list.push_back(polygon_2d.len() - 1 - i);
+            }
+        }
+    }
+    let max_len = index_linked_list.len();
+    let maxmax_len = index_linked_list.len();
+    let mut turn: usize = 0;
+    while &index_linked_list.len() > &3 {
+        turn += 1;
+        if turn > max_len && max_len == index_linked_list.len() || turn > maxmax_len * maxmax_len {
             break;
         }
+        let i0 = index_linked_list.pop_front().unwrap();
+        let i1 = index_linked_list.pop_front().unwrap();
+        let i2 = index_linked_list.pop_front().unwrap();
+        let x0 = &polygon_2d[i0];
+        let x1 = &polygon_2d[i1];
+        let x2 = &polygon_2d[i2];
+        let v1 = x1 - x0;
+        let v2 = x2 - x0;
+        let cross_v1_v2 = cross_2d(&v1, &v2);
+        if cross_v1_v2 < 0.0 {
+            index_linked_list.push_front(i2);
+            index_linked_list.push_front(i1);
+            index_linked_list.push_back(i0);
+            continue;
+        }
+        let u0 = x1 - x0;
+        let u1 = x2 - x1;
+        let u2 = x0 - x2;
+
+        let mut pt_in_triangle_exist = false;
+        for &elm in &index_linked_list {
+            let pt = &polygon_2d[elm];
+            let w0 = pt - x0;
+            let cross0 = cross_2d(&u0, &w0);
+            let w1 = pt - x1;
+            let cross1 = cross_2d(&u1, &w1);
+            let w2 = pt - x2;
+            let cross2 = cross_2d(&u2, &w2);
+            if cross0 > 0.0 && cross1 > 0.0 && cross2 > 0.0 {
+                // point in triangle cannot make mesh
+                pt_in_triangle_exist = true;
+                break;
+            }
+        }
+        if pt_in_triangle_exist {
+            index_linked_list.push_front(i2);
+            index_linked_list.push_front(i1);
+            index_linked_list.push_back(i0);
+            continue;
+        }
+        triangle_list_2d.push(Vector3::new(i0, i1, i2));
+        index_linked_list.push_front(i2);
+        index_linked_list.push_back(i0);
     }
     let i0 = index_linked_list.pop_front().unwrap();
     let i1 = index_linked_list.pop_front().unwrap();
@@ -195,7 +209,7 @@ mod tests {
                 (0.0, 0.0, 0.0),
                 (0.0, 0.0, 1.0),
                 (0.0, 1.0, 1.0),
-                (0.0, 1.0, 0.0)
+                (0.0, 1.0, 0.0),
             ]);
         let expectation = true;
 
@@ -210,7 +224,7 @@ mod tests {
                 (1.0, 0.0, 0.0),
                 (0.0, 0.0, 1.0),
                 (0.0, 1.0, 1.0),
-                (0.0, 1.0, 0.0)
+                (0.0, 1.0, 0.0),
             ]);
         let expectation = false;
         test_coplanar(p, expectation);
@@ -226,7 +240,7 @@ mod tests {
                 (4.0, 0.0, 4.0),
                 (6.0, 2.5, 2.0),
                 (4.0, 5.0, 0.0),
-                (0.0, 5.0, 0.0)
+                (0.0, 5.0, 0.0),
             ]);
         let expectation = true;
         test_coplanar(p, expectation);
@@ -242,7 +256,7 @@ mod tests {
                 (4.0, 0.0, 4.0),
                 (2.0, 2.5, 2.0),
                 (4.0, 5.0, 0.0),
-                (0.0, 5.0, 0.0)
+                (0.0, 5.0, 0.0),
             ]);
         let expectation = true;
         test_coplanar(p, expectation);
@@ -271,7 +285,7 @@ mod tests {
                 (1.573233371040, 5.901431367591, 6.571815895088), // O
                 (-0.1686168235859, 6.659749358895, 5.248741685711), // P
                 (0.9129904320214, -2.698786229022, 3.995387510839), // Q
-                (-4.563954906766, 4.668390903673, 0.9984949436191) // R
+                (-4.563954906766, 4.668390903673, 0.9984949436191), // R
             ]);
         let expectation = true;
         test_coplanar(p, expectation);
@@ -287,7 +301,7 @@ mod tests {
                 (4.0, 0.0, 4.0),
                 (2.0, 2.5, 3.0),
                 (4.0, 5.0, 0.0),
-                (0.0, 5.0, 0.0)
+                (0.0, 5.0, 0.0),
             ]);
         let expectation = false;
         test_coplanar(p, expectation);
@@ -307,7 +321,7 @@ mod tests {
                 (0.0, 0.0, 0.0),
                 (0.0, 0.0, 1.0),
                 (0.0, 1.0, 1.0),
-                (0.0, 1.0, 0.0)
+                (0.0, 1.0, 0.0),
             ]);
         test_triangularized(p, 2);
     }
