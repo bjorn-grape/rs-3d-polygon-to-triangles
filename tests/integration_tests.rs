@@ -1,40 +1,47 @@
 use std::fs::File;
 use std::io::Write;
 use rs_3d_polygon_to_triangles::triangularize_polygon;
-use nalgebra::{Vector, Vector3};
 
 
 fn print_triangles_in_python_format(p: &Vec<(f32, f32, f32)>, file: &mut File) {
-    file.write(b"#! /bin/env/python3\n");
-    file.write(b"#/!\\ Generated file => run me with python3\n");
-    file.write(b"from base import make_plot\n");
+    let mut str_acc: String = "#! /bin/env/python3\n".to_owned();
+    str_acc += "#/!\\ Generated file => run me with python3\n";
+    str_acc += "from base import make_plot\n";
     let res = triangularize_polygon(p);
-    file.write(b"list_index = [");
+    str_acc += "list_index = [";
     let mut index: usize = 0;
     let tri = match res {
         Some(elm) => elm,
-        None => { assert!(false); vec![] }
+        None => {
+            assert!(false);
+            vec![]
+        }
     };
     let maxlen = &tri.len();
     for elm in tri {
-        file.write(format!("[{},{},{}]", elm[0], elm[1], elm[2]).as_ref());
+        str_acc += format!("[{},{},{}]", elm[0], elm[1], elm[2]).as_ref();
         if index != maxlen - 1 {
-            file.write(b",");
+            str_acc += ",";
         }
         index += 1;
     }
-    file.write(b"]\n");
-    file.write(b"list_points = [");
+    str_acc += "]\n";
+    str_acc += "list_points = [";
     let maxlen2 = &p.len();
     for index2 in 0..(p.len()) {
-        file.write(format!("[{},{},{}]", &p[index2].0, &p[index2].1, &p[index2].2).as_ref());
+        str_acc += format!("[{},{},{}]", &p[index2].0, &p[index2].1, &p[index2].2).as_ref();
         if index2 != maxlen2 - 1 {
-            file.write(b",");
+            str_acc += ",";
         }
     }
 
-    file.write(b"]\n");
-    file.write(b"make_plot(list_index, list_points)\n");
+    str_acc += "]\n";
+    str_acc += "make_plot(list_index, list_points)\n";
+    match file.write(str_acc.as_bytes())
+    {
+        Ok(_) => print!(""),
+        Err(err) => panic!("couldn't write to file: {}", err)
+    }
 }
 
 
@@ -46,7 +53,7 @@ fn print_square_to_triangles() {
             (0.0, 0.0, 0.0),
             (0.0, 0.0, 1.0),
             (0.0, 1.0, 1.0),
-            (0.0, 1.0, 0.0)
+            (0.0, 1.0, 0.0),
         ];
 
     print_triangles_in_python_format(&p, &mut file_out);
@@ -76,7 +83,7 @@ static CONCAVE_18GON: [[f32; 3]; 18] = [
 fn convert_2_tuple_vec(arr: &[[f32; 3]; 18]) -> Vec<(f32, f32, f32)> {
     let mut vecc = Vec::new();
     for line in arr {
-        let tpl: (f32,f32,f32) = (line[0], line[1], line[2]);
+        let tpl: (f32, f32, f32) = (line[0], line[1], line[2]);
         vecc.push(tpl);
     }
     return vecc;
@@ -96,7 +103,7 @@ fn revert_vec(arr: &Vec<(f32, f32, f32)>) -> Vec<(f32, f32, f32)>
 #[test]
 fn print_concave_18tagon() {
     let mut file_out = File::create("python_testing/18gon.py").unwrap();
-    let concave_18gon : Vec<(f32, f32, f32)> = convert_2_tuple_vec(&CONCAVE_18GON);
+    let concave_18gon: Vec<(f32, f32, f32)> = convert_2_tuple_vec(&CONCAVE_18GON);
     print_triangles_in_python_format(&concave_18gon, &mut file_out);
 }
 
@@ -106,7 +113,7 @@ fn print_concave_18tagon() {
 fn print_concave_18tagon_reverted() {
     let mut file_out = File::create("python_testing/18gon_reverted.py").unwrap();
 
-    let concave_18gon : Vec<(f32, f32, f32)> = convert_2_tuple_vec(&CONCAVE_18GON);
+    let concave_18gon: Vec<(f32, f32, f32)> = convert_2_tuple_vec(&CONCAVE_18GON);
     let revert_concave_poly = revert_vec(&concave_18gon);
     print_triangles_in_python_format(&revert_concave_poly, &mut file_out);
 }

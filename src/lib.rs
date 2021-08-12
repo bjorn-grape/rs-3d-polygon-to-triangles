@@ -1,8 +1,7 @@
-use nalgebra::{Vector3, Vector2, Vector};
+use nalgebra::{Vector3, Vector2};
 use std::f32::EPSILON;
 use std::collections::LinkedList;
 use std::borrow::BorrowMut;
-use crate::PolygonOrientation::ClockWise;
 
 fn is_coplanar(polygon: &Vec<usize>, positions: &Vec<Vector3<f32>>) -> bool {
     if polygon.len() < 3 {
@@ -32,28 +31,19 @@ fn is_coplanar(polygon: &Vec<usize>, positions: &Vec<Vector3<f32>>) -> bool {
 }
 
 fn project_to_2d(polygon: &Vec<usize>, positions: &Vec<Vector3<f32>>) -> Vec<Vector2<f32>> {
-    let e1: Vector3<f32> = &positions[polygon[1] as usize] - &positions[polygon[0] as usize];
-    let tmp: Vector3<f32> = &positions[polygon[2] as usize] - &positions[polygon[0] as usize];
+    let e1: Vector3<f32> = &positions[polygon[1] as usize] - &positions[polygon[0]];
+    let tmp: Vector3<f32> = &positions[polygon[2] as usize] - &positions[polygon[0]];
     let crossed = e1.cross(&tmp).normalize();
     let e2 = -e1.cross(&crossed);
     let v0: &Vector3<f32> = &positions[polygon[0] as usize];
-    let x0 = v0[0];
-    let y0 = v0[1];
-    let z0 = v0[2];
-    let e1x = e1[0];
-    let e1y = e1[1];
-    let e1z = e1[2];
-    let e2x = e2[0];
-    let e2y = e2[1];
-    let e2z = e2[2];
     let mut projected_2d_points: Vec<Vector2<f32>> = vec![];
     for elm in polygon {
         let v1: &Vector3<f32> = &positions[*elm];
-        let vx = v1.x - x0;
-        let vy = v1.y - y0;
-        let vz = v1.z - z0;
-        let x_f: f32 = vx * e1x + vy * e1y + vz * e1z;
-        let y_f: f32 = vx * e2x + vy * e2y + vz * e2z;
+        let vx = v1.x - v0.x;
+        let vy = v1.y - v0.y;
+        let vz = v1.z - v0.z;
+        let x_f: f32 = vx * e1.x + vy * e1.y + vz * e1.z;
+        let y_f: f32 = vx * e2.x + vy * e2.y + vz * e2.z;
         projected_2d_points.push(Vector2::new(x_f, y_f))
     }
     projected_2d_points
@@ -102,18 +92,16 @@ pub fn triangularize_index_list(index_list: &Vec<usize>, point3d_list: &Vec<Vect
 
     let mut triangle_list_2d: Vec<Vector3<usize>> = vec![];
 
-    let mut index_linked_list: LinkedList<usize> = LinkedList::new();
-
     let winding = find_polygon_winding(index_list, &polygon_2d);
 
-    index_linked_list = LinkedList::new();
+    let mut index_linked_list: LinkedList<usize> = LinkedList::new();
     match &winding {
-        ClockWise => {
+        PolygonOrientation::ClockWise => {
             for i in 0..polygon_2d.len() {
                 &index_linked_list.push_back(i);
             }
         }
-        CounterClockwise => {
+        PolygonOrientation::CounterClockwise => {
             for i in 0..polygon_2d.len() {
                 &index_linked_list.push_back(polygon_2d.len() - 1 - i);
             }
